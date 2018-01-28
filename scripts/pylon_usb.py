@@ -17,26 +17,20 @@ from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from goprocam import GoProCamera, constants
 
-#以下, GoProで画像取り込み(未完成)
 class ImageInput:
     def __init__(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb0"), camera=constants.gpcontrol, webcam_device="usb0")
-        gopro.webcamFOV(constants.Webcam.FOV.Narrow)
-        
-        gopro.startWebcam(resolution="720")
-        self.cap = cv2.VideoCapture("udp://172.21.173.54:8554?overrun_nonfatal=1&fifo_size=50000000", cv2.CAP_FFMPEG)
+        self.bridge = CvBridge()
+        self.image_sub = rospy.Subscriber("/usb_cam_1/image_raw", Image, self.image_callback)
+        self.bgr_image = np.arange(27).reshape(3, 3, 3)
 
-    def image_read(self):
+    def image_callback(self, image_data):
         try:
-            ret, bgr_image  = self.cap.read()
-            return bgr_image
-            # frame = cv2.resize(frame, (1696, 960))
-
-        except cv2.error as e:
+            self.bgr_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
+        except CvBridgeError as e:
             rospy.logerr(e)
 
 class PylonDetector:
+
     # パイロンナンバー
     PYLON_NUMBER = 1
     # 赤パイロンのHSV閾値
@@ -52,9 +46,9 @@ class PylonDetector:
     # パイロンの高さ[mm]
     PYLON_HEIGHT = 165
     # 画面の中央(横方向)[pixel]
-    IMAGE_CENTER_X = 640
+    IMAGE_CENTER_X = 320
     # 画面の中央(高さ方向)[pixel]
-    IMAGE_CENTER_Y = 360
+    IMAGE_CENTER_Y = 240
     # パイロンの最小高さ
     MIN_HEIGHT = 20
     # 600mm先のz位置[mm]
@@ -247,7 +241,8 @@ class PylonDetector:
 
     #OpenCVで画像を表示
     def image_show(self):
-        cv2.imshow('pylon_detection',self.image)
+        cv2.imshow('pylon_detection',self.image.astype('uint8'))
+        cv2.waitKey()
 
 def circle_dector_main():
     # ビデオ映像の取得
@@ -255,20 +250,15 @@ def circle_dector_main():
     pylon_dector = PylonDetector()
     rate = rospy.Rate(60)
     while not rospy.is_shutdown():
-        start = time.time()
-        pylon_dector.image = pylon_dector.image_input.image_read()
+        pylon_dector.image = pylon_dector.image_input.bgr_image
         pylon_dector.detection_main()
-        detection_time = time.time()
-        print(detection_time-start)
         pylon_dector.image_show()
 
         # 終了の合図
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
         rate.sleep()
-        end_time = time.time() - start
         # print end_time
-    pylon_dector.image_input.cap.release()
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':

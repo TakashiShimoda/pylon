@@ -219,6 +219,7 @@ class PylonDetector:
         if depth > convert_x:
             Z = math.sqrt(depth * depth - convert_x * convert_x)
         convert_x, convert_y, Z, depth = round(convert_x), round(convert_y), round(Z), round(depth)
+        cv2.putText(self.image, "Z="+str(Z)+"[mm]", (30, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), thickness=2)
         return convert_x, convert_y, Z, depth
         
     # # 三次元位置(X, Y, Z)の計算(回転あり)
@@ -270,9 +271,10 @@ def circle_dector_main():
     while not rospy.is_shutdown():
         start = time.time()
         pylon_dector.image = pylon_dector.image_imput.image_read()
+        detection_start = time.time()
         pylon_dector.detection_main()
         detection_time = time.time()
-        print(detection_time-start)
+        print(detection_time-detection_start)
         pylon_dector.image_show()
 
         # 終了の合図

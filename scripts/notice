@@ -1,0 +1,2 @@
+pylon検知ノードはrosrunで個別に起動してやるほうがいい(でないとラグがいつまで経っても残る)
+その他(move_robot, odometry, rosserialはgopro.launchで一斉に起動できる)
