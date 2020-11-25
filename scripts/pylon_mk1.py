@@ -14,10 +14,35 @@ import sys
 import cv2
 import time
 import math
+import socket
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
+from goprocam import GoProCamera, constants
 
+#以下, GoProで画像取り込み(未完成)
+class ImageImput:
+    def __init__(self):
+        self.bgr_image = None
+
+    def image_callback():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("enp0s20f0u3"), camera=constants.gpcontrol, webcam_device="enp0s20f0u3")
+        gopro.webcamFOV(constants.Webcam.FOV.Wide)
+        gopro.startWebcam(resolution="480")
+        cap = cv2.VideoCapture("udp://172.21.173.54:8554", cv2.CAP_FFMPEG)
+        t = time.time()
+        
+        while True:
+            try:
+                self.bgr_image  = cap.read()
+                # frame = cv2.resize(frame, (1696, 960))
+
+            except CV_Error as e:
+                rospy.logerr(e)
+
+
+"""
 class ImageImput:
     def __init__(self):
         self.bridge = CvBridge()
@@ -29,6 +54,7 @@ class ImageImput:
             self.bgr_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
         except CvBridgeError as e:
             rospy.logerr(e)
+"""
 
 class PylonDetector:
     # パイロンナンバー
