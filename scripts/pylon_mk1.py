@@ -25,16 +25,16 @@ class ImageImput:
         gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("enp0s20f0u3"), camera=constants.gpcontrol, webcam_device="enp0s20f0u3")
         gopro.webcamFOV(constants.Webcam.FOV.Wide)
         gopro.startWebcam(resolution="480")
-        cap = cv2.VideoCapture("udp://172.21.173.54:8554", cv2.CAP_FFMPEG)
+        self.cap = cv2.VideoCapture("udp://172.21.173.54:8554", cv2.CAP_FFMPEG)
         t = time.time()
 
     def image_read(self):
         try:
-            ret, bgr_image  = cap.read()
+            ret, bgr_image  = self.cap.read()
             return bgr_image
             # frame = cv2.resize(frame, (1696, 960))
 
-        except CV_Error as e:
+        except cv2.error as e:
             rospy.logerr(e)
 
 """
