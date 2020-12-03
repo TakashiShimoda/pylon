@@ -4,52 +4,40 @@
 """
 2019-7-23 yamada
 パイロン認識
+usb_cam_node と併用で利用可能
+
 """
 
 import rospy
 import numpy as np
-import sys
-import cv2
+import cv2, socket
 import time
 import math
-import socket
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from goprocam import GoProCamera, constants
 
-#以下, GoProで画像取り込み(未完成)
 class ImageImput:
     def __init__(self):
+        self.bgr_image = None
+
+    def image_callback():
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("enp0s20f0u3"), camera=constants.gpcontrol, webcam_device="enp0s20f0u3")
         gopro.webcamFOV(constants.Webcam.FOV.Wide)
         gopro.startWebcam(resolution="480")
         cap = cv2.VideoCapture("udp://172.21.173.54:8554", cv2.CAP_FFMPEG)
         t = time.time()
+        
+        while True:
+            try:
+                self.bgr_image  = cap.read()
+                # frame = cv2.resize(frame, (1696, 960))
 
-    def image_read(self):
-        try:
-            ret, bgr_image  = cap.read()
-            return bgr_image
-            # frame = cv2.resize(frame, (1696, 960))
+            except CV_Error as e:
+                rospy.logerr(e)
 
-        except CV_Error as e:
-            rospy.logerr(e)
-
-"""
-class ImageImput:
-    def __init__(self):
-        self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.image_callback)
-        self.bgr_image = None
-
-    def image_callback(self, image_data):
-        try:
-            self.bgr_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
-        except CvBridgeError as e:
-            rospy.logerr(e)
-"""
 
 class PylonDetector:
     # パイロンナンバー
@@ -104,7 +92,7 @@ class PylonDetector:
             # パラメータのセット
             self.set_param()
             # イメージをパブリッシュ
-            #self.pub_image()
+            self.pub_image()
             # cv2.imshow('KUKEI', self.image)
 
     # BGRからHSVに変換
@@ -243,12 +231,11 @@ class PylonDetector:
             rospy.set_param('/pylon_detection/param_x', self.convert_x_datas[max_index])
             rospy.set_param('/pylon_detection/param_z', self.z_datas[max_index])
             #print self.z_datas[max_index]
-        
-        
-    """
+
+    # イメージをパブリッシュ
     def pub_image(self):
         self.camera_publish.publish(self.image_imput.bridge.cv2_to_imgmsg(self.image, 'bgr8'))
-    """
+
     # パラメータをパブリッシュ
     def pub_param(self, convert_x, convert_y, Z, height, depth):
         self.convert_x_publish.publish(convert_x)
@@ -265,7 +252,7 @@ def circle_dector_main():
 
     while not rospy.is_shutdown():
         start = time.time()
-        pylon_dector.image = pylon_dector.image_imput.image_read()
+        pylon_dector.image = pylon_dector.image_imput.bgr_image
         pylon_dector.detection_main()
 
         # 終了の合図
