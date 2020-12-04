@@ -25,7 +25,7 @@ class ImageImput:
         gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("enp0s20f0u3"), camera=constants.gpcontrol, webcam_device="enp0s20f0u3")
         gopro.webcamFOV(constants.Webcam.FOV.Wide)
         gopro.startWebcam(resolution="480")
-        self.cap = cv2.VideoCapture("udp://172.21.173.54:8554", cv2.CAP_FFMPEG)
+        self.cap = cv2.VideoCapture("udp://172.21.173.54:8554?overrun_nonfatal=1&fifo_size=50000000", cv2.CAP_FFMPEG)
         t = time.time()
 
     def image_read(self):
@@ -231,7 +231,7 @@ class PylonDetector:
     #     convert_x = (top_left[0] - self.IMAGE_CENTER_X) * one_pixel_size
     #     convert_y = (self.IMAGE_CENTER_Y - top_left[1]) * one_pixel_size
     #     if depth > convert_x:
-    #         Z = math.sqrt(depth * depth - convert_x * convert_x)
+    #         Z = math.sqrt(depth * depth - convert_x * convert_x)CV_Error
     #     convert_x, convert_y, Z, depth = round(convert_x), round(convert_y), round(Z), round(depth)
     #     return convert_x, convert_y, Z, depth
     
