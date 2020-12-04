@@ -36,8 +36,9 @@ class ImageImput:
 
         except cv2.error as e:
             rospy.logerr(e)
-
-"""
+            
+#オリジナル(usb_camからフレームを取得)
+""" 
 class ImageImput:
     def __init__(self):
         self.bridge = CvBridge()
