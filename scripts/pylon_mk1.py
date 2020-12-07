@@ -23,7 +23,7 @@ class ImageImput:
     def __init__(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("enp0s20f0u3"), camera=constants.gpcontrol, webcam_device="enp0s20f0u3")
-        gopro.webcamFOV(constants.Webcam.FOV.Wide)
+        gopro.webcamFOV(constants.Webcam.FOV.Narrow)
         gopro.startWebcam(resolution="480")
         self.cap = cv2.VideoCapture("udp://172.21.173.54:8554?overrun_nonfatal=1&fifo_size=50000000", cv2.CAP_FFMPEG)
 
@@ -265,7 +265,7 @@ def circle_dector_main():
     # ビデオ映像の取得
     rospy.init_node('pylon_dector')
     pylon_dector = PylonDetector()
-    rate = rospy.Rate(30)
+    rate = rospy.Rate(100)
 
     while not rospy.is_shutdown():
         start = time.time()
