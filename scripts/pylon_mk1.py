@@ -26,7 +26,6 @@ class ImageImput:
         gopro.webcamFOV(constants.Webcam.FOV.Wide)
         gopro.startWebcam(resolution="480")
         self.cap = cv2.VideoCapture("udp://172.21.173.54:8554?overrun_nonfatal=1&fifo_size=50000000", cv2.CAP_FFMPEG)
-        t = time.time()
 
     def image_read(self):
         try:
@@ -36,7 +35,7 @@ class ImageImput:
 
         except cv2.error as e:
             rospy.logerr(e)
-            
+
 #オリジナル(usb_camからフレームを取得)
 """ 
 class ImageImput:
@@ -258,6 +257,10 @@ class PylonDetector:
         self.h_publish.publish(height)
         self.depth_publish.publish(depth)
 
+    #OpenCVで画像を表示
+    def image_show(self):
+        cv2.imshow('pylon_detection',self.image)
+
 def circle_dector_main():
     # ビデオ映像の取得
     rospy.init_node('pylon_dector')
@@ -268,6 +271,7 @@ def circle_dector_main():
         start = time.time()
         pylon_dector.image = pylon_dector.image_imput.image_read()
         pylon_dector.detection_main()
+        pylon_dector.image_show()
 
         # 終了の合図
         if cv2.waitKey(1) & 0xFF == ord('q'):

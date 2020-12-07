@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import rospy, sys
+import rospy
 from std_msgs.msg import String
 from std_msgs.msg import Float32
 
