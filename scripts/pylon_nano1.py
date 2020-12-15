@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 
 """
-2019-7-23 yamada
-パイロン認識
+2019-7-23 yamada, 2020-12-15 modified by shimoda
+パイロン認識 OpenCV4.1.0で動作
 """
 
 import rospy
@@ -37,21 +37,6 @@ class ImageImput:
 
         except cv2.error as e:
             rospy.logerr(e)
-
-#オリジナル(usb_camからフレームを取得)
-""" 
-class ImageImput:
-    def __init__(self):
-        self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.image_callback)
-        self.bgr_image = None
-
-    def image_callback(self, image_data):
-        try:
-            self.bgr_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
-        except CvBridgeError as e:
-            rospy.logerr(e)
-"""
 
 class PylonDetector:
     # パイロンナンバー
@@ -125,7 +110,7 @@ class PylonDetector:
         morphology_close_image = cv2.morphologyEx(binarization_image, cv2.MORPH_CLOSE, self.MORPHOLOGY_KERNEL_SIZE)
         # cv2.imshow('mask', morphology_close_image)
         # 輪郭検出
-        image, countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # print countours
         return countours
 

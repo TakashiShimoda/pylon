@@ -43,7 +43,6 @@ class ImageImput:
         self.bridge = CvBridge()
         self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.image_callback)
         self.bgr_image = None
-
     def image_callback(self, image_data):
         try:
             self.bgr_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
