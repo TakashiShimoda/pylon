@@ -2,13 +2,14 @@
 # -*- coding: utf-8 -*-
 
 """
-2019-7-23 yamada
-パイロン認識
+2019-7-23 yamada, 2020-12-15 modified by shimoda
+パイロン認識 OpenCV4.1.0で動作
 """
 
 import rospy
 import numpy as np
 import sys
+sys.path.append('/home/satolabo/.pyenv/versions/3.6.9/lib/python3.6/site-packages/lib/python3.6/site-packages')
 import cv2
 import time
 import math
@@ -22,8 +23,9 @@ from goprocam import GoProCamera, constants
 class ImageImput:
     def __init__(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("enp0s20f0u3"), camera=constants.gpcontrol, webcam_device="enp0s20f0u3")
+        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb1"), camera=constants.gpcontrol, webcam_device="usb1")
         gopro.webcamFOV(constants.Webcam.FOV.Narrow)
+        
         gopro.startWebcam(resolution="720")
         self.cap = cv2.VideoCapture("udp://172.21.173.54:8554?overrun_nonfatal=1&fifo_size=50000000", cv2.CAP_FFMPEG)
 
@@ -35,20 +37,6 @@ class ImageImput:
 
         except cv2.error as e:
             rospy.logerr(e)
-
-#オリジナル(usb_camからフレームを取得)
-""" 
-class ImageImput:
-    def __init__(self):
-        self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.image_callback)
-        self.bgr_image = None
-    def image_callback(self, image_data):
-        try:
-            self.bgr_image = self.bridge.imgmsg_to_cv2(image_data, "bgr8")
-        except CvBridgeError as e:
-            rospy.logerr(e)
-"""
 
 class PylonDetector:
     # パイロンナンバー
@@ -66,7 +54,7 @@ class PylonDetector:
     # パイロンの高さ[mm]
     PYLON_HEIGHT = 76
     # 画面の中央(横方向)[pixel]
-    IMAGE_CENTER_X = 680
+    IMAGE_CENTER_X = 640
     # 画面の中央(高さ方向)[pixel]
     IMAGE_CENTER_Y = 360
     # パイロンの最小高さ
@@ -122,7 +110,7 @@ class PylonDetector:
         morphology_close_image = cv2.morphologyEx(binarization_image, cv2.MORPH_CLOSE, self.MORPHOLOGY_KERNEL_SIZE)
         # cv2.imshow('mask', morphology_close_image)
         # 輪郭検出
-        image, countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # print countours
         return countours
 
