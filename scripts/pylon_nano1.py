@@ -20,7 +20,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from goprocam import GoProCamera, constants
 
 #以下, GoProで画像取り込み(未完成)
-class ImageImput:
+class ImageInput:
     def __init__(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb1"), camera=constants.gpcontrol, webcam_device="usb1")
@@ -64,7 +64,7 @@ class PylonDetector:
 
     def __init__(self):
         self.is_pylon_data = False
-        self.image_imput = ImageImput()
+        self.image_input = ImageInput()
         self.camera_publish = rospy.Publisher("/camera_image", Image, queue_size=10)
         self.convert_x_publish = rospy.Publisher("/data_x", Float32, queue_size=1)
         self.convert_y_publish = rospy.Publisher("/data_y", Float32, queue_size=1)
@@ -252,11 +252,10 @@ def circle_dector_main():
     # ビデオ映像の取得
     rospy.init_node('pylon_dector')
     pylon_dector = PylonDetector()
-    rate = rospy.Rate(100)
-
+    rate = rospy.Rate(60)
     while not rospy.is_shutdown():
         start = time.time()
-        pylon_dector.image = pylon_dector.image_imput.image_read()
+        pylon_dector.image = pylon_dector.image_input.image_read()
         pylon_dector.detection_main()
         pylon_dector.image_show()
 

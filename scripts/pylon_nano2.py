@@ -2,42 +2,42 @@
 # -*- coding: utf-8 -*-
 
 """
-2019-7-23 yamada
-パイロン認識
-usb_cam_node と併用で利用可能
-
+2019-7-23 yamada, 2020-12-15 modified by shimoda
+パイロン認識 OpenCV4.1.0で動作
 """
 
 import rospy
 import numpy as np
-import cv2, socket
+import sys
+import cv2
 import time
 import math
+import socket
+import threading
 from std_msgs.msg import Float32
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge, CvBridgeError
 from goprocam import GoProCamera, constants
+from queue import Queue
 
-class ImageImput:
-    def __init__(self):
-        self.bgr_image = None
+#以下, GoProで画像取り込み(未完成)
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb1"), camera=constants.gpcontrol, webcam_device="usb1")
+gopro.webcamFOV(constants.Webcam.FOV.Narrow)
+gopro.startWebcam(resolution="720")
+cap = cv2.VideoCapture("udp://172.21.173.54:8554?overrun_nonfatal=1&fifo_size=50000000", cv2.CAP_FFMPEG)
+q = Queue()
 
-    def image_callback():
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("enp0s20f0u3"), camera=constants.gpcontrol, webcam_device="enp0s20f0u3")
-        gopro.webcamFOV(constants.Webcam.FOV.Wide)
-        gopro.startWebcam(resolution="480")
-        cap = cv2.VideoCapture("udp://172.21.173.54:8554", cv2.CAP_FFMPEG)
-        t = time.time()
-        
-        while True:
-            try:
-                self.bgr_image  = cap.read()
-                # frame = cv2.resize(frame, (1696, 960))
-
-            except CV_Error as e:
-                rospy.logerr(e)
-
+def image_read():
+    while True:
+        try:
+            ret, bgr_image = cap.read()
+            q.put(bgr_image)
+            time.sleep(0.001)
+            # frame = cv2.resize(frame, (1696, 960))
+            
+        except cv2.error as e:
+            rospy.logerr(e)
 
 class PylonDetector:
     # パイロンナンバー
@@ -55,9 +55,9 @@ class PylonDetector:
     # パイロンの高さ[mm]
     PYLON_HEIGHT = 76
     # 画面の中央(横方向)[pixel]
-    IMAGE_CENTER_X = 320
+    IMAGE_CENTER_X = 640
     # 画面の中央(高さ方向)[pixel]
-    IMAGE_CENTER_Y = 240
+    IMAGE_CENTER_Y = 360
     # パイロンの最小高さ
     MIN_HEIGHT = 30
     # 600mm先のz位置[mm]
@@ -65,7 +65,6 @@ class PylonDetector:
 
     def __init__(self):
         self.is_pylon_data = False
-        self.image_imput = ImageImput()
         self.camera_publish = rospy.Publisher("/camera_image", Image, queue_size=10)
         self.convert_x_publish = rospy.Publisher("/data_x", Float32, queue_size=1)
         self.convert_y_publish = rospy.Publisher("/data_y", Float32, queue_size=1)
@@ -83,6 +82,7 @@ class PylonDetector:
     def detection_main(self):
         image_width = self.image.shape[0]
         if image_width > 3:
+            self.get_img()
             # BGRからHSVに変換
             self.hsv_convention()
             # パイロンの輪郭検出
@@ -92,8 +92,11 @@ class PylonDetector:
             # パラメータのセット
             self.set_param()
             # イメージをパブリッシュ
-            self.pub_image()
+            #self.pub_image()
             # cv2.imshow('KUKEI', self.image)
+    
+    def get_img(self):
+        self.img = q.get()
 
     # BGRからHSVに変換
     def hsv_convention(self):
@@ -111,7 +114,7 @@ class PylonDetector:
         morphology_close_image = cv2.morphologyEx(binarization_image, cv2.MORPH_CLOSE, self.MORPHOLOGY_KERNEL_SIZE)
         # cv2.imshow('mask', morphology_close_image)
         # 輪郭検出
-        image, countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # print countours
         return countours
 
@@ -219,7 +222,7 @@ class PylonDetector:
     #     convert_x = (top_left[0] - self.IMAGE_CENTER_X) * one_pixel_size
     #     convert_y = (self.IMAGE_CENTER_Y - top_left[1]) * one_pixel_size
     #     if depth > convert_x:
-    #         Z = math.sqrt(depth * depth - convert_x * convert_x)
+    #         Z = math.sqrt(depth * depth - convert_x * convert_x)CV_Error
     #     convert_x, convert_y, Z, depth = round(convert_x), round(convert_y), round(Z), round(depth)
     #     return convert_x, convert_y, Z, depth
     
@@ -231,11 +234,12 @@ class PylonDetector:
             rospy.set_param('/pylon_detection/param_x', self.convert_x_datas[max_index])
             rospy.set_param('/pylon_detection/param_z', self.z_datas[max_index])
             #print self.z_datas[max_index]
-
-    # イメージをパブリッシュ
+        
+        
+    """
     def pub_image(self):
         self.camera_publish.publish(self.image_imput.bridge.cv2_to_imgmsg(self.image, 'bgr8'))
-
+    """
     # パラメータをパブリッシュ
     def pub_param(self, convert_x, convert_y, Z, height, depth):
         self.convert_x_publish.publish(convert_x)
@@ -244,16 +248,23 @@ class PylonDetector:
         self.h_publish.publish(height)
         self.depth_publish.publish(depth)
 
+    #OpenCVで画像を表示
+    def image_show(self):
+        cv2.imshow('pylon_detection',self.image)
+
+
 def circle_dector_main():
-    # ビデオ映像の取得
-    rospy.init_node('pylon_dector')
+    thread1 = threading.Thread(target = image_read)
+    thread1.start()
     pylon_dector = PylonDetector()
+    rospy.init_node('pylon_dector')
     rate = rospy.Rate(30)
 
     while not rospy.is_shutdown():
         start = time.time()
-        pylon_dector.image = pylon_dector.image_imput.bgr_image
+        #pylon_dector.image = pylon_dector.image_input.image_read()
         pylon_dector.detection_main()
+        pylon_dector.image_show()
 
         # 終了の合図
         if cv2.waitKey(1) & 0xFF == ord('q'):

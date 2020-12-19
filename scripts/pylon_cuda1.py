@@ -3,7 +3,7 @@
 
 """
 2019-7-23 yamada, 2020-12-15 modified by shimoda
-パイロン認識 OpenCV4.1.0で動作
+パイロン認識 OpenCV4.1.0で動作, CUDA使用
 """
 
 import rospy
@@ -23,7 +23,7 @@ from goprocam import GoProCamera, constants
 class ImageImput:
     def __init__(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb1"), camera=constants.gpcontrol, webcam_device="usb1")
+        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb1"), camera=constants.gpcontrol, webcam_device="usb1") #getWebCamIPにはGoProのネットワークインターフェース名を入力
         gopro.webcamFOV(constants.Webcam.FOV.Narrow)
         
         gopro.startWebcam(resolution="720")
@@ -77,11 +77,21 @@ class PylonDetector:
         self.z_datas = [0] * self.PYLON_NUMBER
         self.h_datas = [0] * self.PYLON_NUMBER
         self.convert_x_datas = [0] * self.PYLON_NUMBER
+        #GPUメモリのアロケーション
+        self.img_gpu_src = cv2.cuda_GpuMat()
+        self.img_gpu_dst = cv2.cuda_GpuMat()
+        self.hsv_image = cv2.cuda_GpuMat()
+        self.aussian_filter_image = cv2.cuda_GpuMat()
+        self.binarization_image_1 = cv2.cuda_GpuMat()
+        self.binarization_image_2 = cv2.cuda_GpuMat()
+
 
     # 検出のメイン(流れ)
     def detection_main(self):
         image_width = self.image.shape[0]
         if image_width > 3:
+            #GPUメモリに画像をアップロード
+            self.upload()
             # BGRからHSVに変換
             self.hsv_convention()
             # パイロンの輪郭検出
@@ -94,14 +104,19 @@ class PylonDetector:
             #self.pub_image()
             # cv2.imshow('KUKEI', self.image)
 
+    #GPUメモリに画像をアップロード
+    def upload(self):
+        self.img_gpu_src.upload(self.image)
+
     # BGRからHSVに変換
     def hsv_convention(self):
-        self.hsv_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+        self.hsv_image = cv2.cuda.cvtColor(self.img_gpu_src, cv2.COLOR_BGR2HSV)
 
     # パイロンの輪郭検出
     def outline_detection(self):
         # ガウシアンフィルタをかける
-        gaussian_filter_image = cv2.GaussianBlur(self.hsv_image, self.GAUSSIAN_KERNEL_SIZE, 0)
+        filter = cv2.cuda.createGaussianFilter(cv2.CV_8UC3, cv2.CV_8UC3, ksize = self.GAUSSIAN_KERNEL_SIZE, sigma1=0, sigma2=0)
+        gaussian_filter_image = cv2.cuda_Filter.apply(filter, self.hsv_image)
         # 二値化
         binarization_image_1 = cv2.inRange(gaussian_filter_image, self.RED_PYLON_COLOR[0], self.RED_PYLON_COLOR[1])
         binarization_image_2 = cv2.inRange(gaussian_filter_image, self.RED_PYLON_COLOR[2], self.RED_PYLON_COLOR[3])
