@@ -80,11 +80,6 @@ class PylonDetector:
         #GPUメモリのアロケーション
         self.img_gpu_src = cv2.cuda_GpuMat()
         self.img_gpu_dst = cv2.cuda_GpuMat()
-        self.hsv_image = cv2.cuda_GpuMat()
-        self.aussian_filter_image = cv2.cuda_GpuMat()
-        self.binarization_image_1 = cv2.cuda_GpuMat()
-        self.binarization_image_2 = cv2.cuda_GpuMat()
-
 
     # 検出のメイン(流れ)
     def detection_main(self):
@@ -92,8 +87,6 @@ class PylonDetector:
         if image_width > 3:
             #GPUメモリに画像をアップロード
             self.upload()
-            # BGRからHSVに変換
-            self.hsv_convention()
             # パイロンの輪郭検出
             countours = self.outline_detection()
             # パイロンの情報
@@ -108,26 +101,16 @@ class PylonDetector:
     def upload(self):
         self.img_gpu_src.upload(self.image)
 
-    # BGRからHSVに変換
-    def hsv_convention(self):
-        self.hsv_image = cv2.cuda.cvtColor(self.img_gpu_src, cv2.COLOR_BGR2HSV)
-
     # パイロンの輪郭検出
     def outline_detection(self):
         # ガウシアンフィルタをかける
-        filter = cv2.cuda.createGaussianFilter(cv2.CV_8UC3, cv2.CV_8UC3, ksize = self.GAUSSIAN_KERNEL_SIZE, sigma1=0, sigma2=0)
-        gaussian_filter_image = cv2.cuda_Filter.apply(filter, self.hsv_image)
-        # 二値化
-        binarization_image_1 = cv2.inRange(gaussian_filter_image, self.RED_PYLON_COLOR[0], self.RED_PYLON_COLOR[1])
-        binarization_image_2 = cv2.inRange(gaussian_filter_image, self.RED_PYLON_COLOR[2], self.RED_PYLON_COLOR[3])
-        binarization_image = cv2.add(binarization_image_1, binarization_image_2)
-        # クロージング(膨張、収縮の順に行う演算)
-        morphology_close_image = cv2.morphologyEx(binarization_image, cv2.MORPH_CLOSE, self.MORPHOLOGY_KERNEL_SIZE)
-        # cv2.imshow('mask', morphology_close_image)
-        # 輪郭検出
-        countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        # print countours
-        return countours
+        cuSrc = cv2.cuda.cvtColor(self.img_gpu_src, cv2.COLOR_BGR2GRAY)
+        filter = cv2.cuda.createGaussianFilter(srcType = cv2.CV_8UC1, dstType=cv2.CV_8UC1, ksize = (3,3), sigma1=0, sigma2 = 0)
+        cuSrc = cv2.cuda_Filter.apply(filter, cuSrc)
+        ret, cuSrc = cv2.cuda.threshold(cuSrc, 98, 255, cv2.THRESH_BINARY)
+        dst = cuSrc.download()
+        contours, _ = cv2.findContours(image = dst, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE)
+        return contours
 
     # パイロンの情報
     def pylon_infomations(self, countours, index_number):
