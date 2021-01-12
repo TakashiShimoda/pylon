@@ -50,15 +50,15 @@ class PylonDetector:
     # パイロン〜カメラ間の実際の測定距離[mm]
     BASE_DISTANCE = 600
     # BASE_DISTANCEでのパイロンの高さ[pixel]
-    BASE_HEIGHT = 90
+    BASE_HEIGHT = 195
     # パイロンの高さ[mm]
-    PYLON_HEIGHT = 76
+    PYLON_HEIGHT = 165
     # 画面の中央(横方向)[pixel]
     IMAGE_CENTER_X = 640
     # 画面の中央(高さ方向)[pixel]
     IMAGE_CENTER_Y = 360
     # パイロンの最小高さ
-    MIN_HEIGHT = 30
+    MIN_HEIGHT = 40
     # 600mm先のz位置[mm]
     Z = 600
 
@@ -108,7 +108,7 @@ class PylonDetector:
         binarization_image = cv2.add(binarization_image_1, binarization_image_2)
         # クロージング(膨張、収縮の順に行う演算)
         morphology_close_image = cv2.morphologyEx(binarization_image, cv2.MORPH_CLOSE, self.MORPHOLOGY_KERNEL_SIZE)
-        # cv2.imshow('mask', morphology_close_image)
+        #cv2.imshow('mask', morphology_close_image)
         # 輪郭検出
         countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # print countours
@@ -126,6 +126,7 @@ class PylonDetector:
             x,y,width,height = cv2.boundingRect(cnt)
             # 矩形の左上の座標取得
             top_left = (int(x), int(y))
+            top_center = (int(x)+round(0.5*width), int(y))
             # 矩形の高さ(縦)[pixel]
             height = float(height)
             if height == 0:
@@ -165,7 +166,7 @@ class PylonDetector:
             #     # 矩形描画
             #     cv2.drawContours(self.image, [box], 0, (255, 0, 0), 2)
             
-                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height, top_left)
+                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height, top_center)
                 
                 self.z_datas[index_number] = Z*0.58
                 self.h_datas[index_number] = height
@@ -183,7 +184,7 @@ class PylonDetector:
                 # 矩形描画(回転なし)
                 cv2.rectangle(self.image, (x, y), (x+int(width), y+int(height)), (0, 255, 0), 2)
                 
-                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height, top_left)
+                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height, top_center)
                 
                 self.z_datas[index_number] = Z
                 self.h_datas[index_number] = height
@@ -195,14 +196,14 @@ class PylonDetector:
             return False
 
     # 三次元位置(X, Y, Z)の計算(回転なし)
-    def calculate_depth(self, aspect_ratio, height, top_left):
+    def calculate_depth(self, aspect_ratio, height, top_center):
         # 奥行き方向の計算
         depth = (self.BASE_HEIGHT / float(height)) * self.BASE_DISTANCE
         # 1ピクセル当たりの大きさを計算
         one_pixel_size = self.PYLON_HEIGHT / float(height)
         # 三次元位置(X, Y, Z)の計算
-        convert_x = (top_left[0] - self.IMAGE_CENTER_X) * one_pixel_size
-        convert_y = (self.IMAGE_CENTER_Y - top_left[1]) * one_pixel_size
+        convert_x = (top_center[0] - self.IMAGE_CENTER_X) * one_pixel_size
+        convert_y = (self.IMAGE_CENTER_Y - top_center[1]) * one_pixel_size
         if depth > convert_x:
             Z = math.sqrt(depth * depth - convert_x * convert_x)
         convert_x, convert_y, Z, depth = round(convert_x), round(convert_y), round(Z), round(depth)
@@ -257,6 +258,8 @@ def circle_dector_main():
         start = time.time()
         pylon_dector.image = pylon_dector.image_input.image_read()
         pylon_dector.detection_main()
+        detection_time = time.time()
+        print(detection_time-start)
         pylon_dector.image_show()
 
         # 終了の合図

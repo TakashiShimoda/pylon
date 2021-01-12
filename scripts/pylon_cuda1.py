@@ -9,7 +9,6 @@
 import rospy
 import numpy as np
 import sys
-sys.path.append('/home/satolabo/.pyenv/versions/3.6.9/lib/python3.6/site-packages/lib/python3.6/site-packages')
 import cv2
 import time
 import math
@@ -37,6 +36,17 @@ class ImageImput:
 
         except cv2.error as e:
             rospy.logerr(e)
+"""
+
+class ImageImput:
+    def __init__(self):
+        self.cap = cv2.VideoCapture("test2.MP4")
+    
+    def image_read(self):
+        ret, bgr_image = self.cap.read()
+        print(ret)
+        return bgr_image
+"""            
 
 class PylonDetector:
     # パイロンナンバー
@@ -50,7 +60,7 @@ class PylonDetector:
     # パイロン〜カメラ間の実際の測定距離[mm]
     BASE_DISTANCE = 600
     # BASE_DISTANCEでのパイロンの高さ[pixel]
-    BASE_HEIGHT = 90
+    BASE_HEIGHT = 110
     # パイロンの高さ[mm]
     PYLON_HEIGHT = 76
     # 画面の中央(横方向)[pixel]
@@ -80,6 +90,10 @@ class PylonDetector:
         #GPUメモリのアロケーション
         self.img_gpu_src = cv2.cuda_GpuMat()
         self.img_gpu_dst = cv2.cuda_GpuMat()
+        #CUDA用ガウシアンフィルタ作成
+        self.gaussian_filter = cv2.cuda.createGaussianFilter(cv2.CV_8UC3, cv2.CV_8UC3, ksize = self.GAUSSIAN_KERNEL_SIZE, sigma1=0, sigma2 = 0)
+        #CUDA用モルフォロジーフィルタ作成
+        #self.morphology_filter= cv2.cuda.createMorphologyFilter(cv2.MORPH_CLOSE, cv2.CV_8UC1, self.MORPHOLOGY_KERNEL_SIZE)
 
     # 検出のメイン(流れ)
     def detection_main(self):
@@ -103,13 +117,14 @@ class PylonDetector:
 
     # パイロンの輪郭検出
     def outline_detection(self):
-        # ガウシアンフィルタをかける
-        cuSrc = cv2.cuda.cvtColor(self.img_gpu_src, cv2.COLOR_BGR2GRAY)
-        filter = cv2.cuda.createGaussianFilter(srcType = cv2.CV_8UC1, dstType=cv2.CV_8UC1, ksize = (3,3), sigma1=0, sigma2 = 0)
-        cuSrc = cv2.cuda_Filter.apply(filter, cuSrc)
-        ret, cuSrc = cv2.cuda.threshold(cuSrc, 98, 255, cv2.THRESH_BINARY)
+        cuSrc = cv2.cuda.cvtColor(self.img_gpu_src, cv2.COLOR_BGR2HSV)
+        cuSrc = cv2.cuda_Filter.apply(self.gaussian_filter, cuSrc)
         dst = cuSrc.download()
-        contours, _ = cv2.findContours(image = dst, mode=cv2.RETR_TREE, method=cv2.CHAIN_APPROX_SIMPLE)
+        binarization_image_1 = cv2.inRange(dst, self.RED_PYLON_COLOR[0], self.RED_PYLON_COLOR[1])
+        binarization_image_2 = cv2.inRange(dst, self.RED_PYLON_COLOR[2], self.RED_PYLON_COLOR[3])
+        binarization_image = cv2.add(binarization_image_1, binarization_image_2)
+        morphology_close_image = cv2.morphologyEx(binarization_image, cv2.MORPH_CLOSE, self.MORPHOLOGY_KERNEL_SIZE)
+        contours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         return contours
 
     # パイロンの情報
@@ -256,6 +271,8 @@ def circle_dector_main():
         start = time.time()
         pylon_dector.image = pylon_dector.image_imput.image_read()
         pylon_dector.detection_main()
+        detection_time = time.time()
+        print(detection_time-start)
         pylon_dector.image_show()
 
         # 終了の合図
