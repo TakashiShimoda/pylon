@@ -20,7 +20,7 @@ from goprocam import GoProCamera, constants
 class ImageInput:
     def __init__(self):
         self.bridge = CvBridge()
-        self.image_sub = rospy.Subscriber("/usb_cam_1/image_raw", Image, self.image_callback)
+        self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.image_callback)
         self.bgr_image = np.arange(27).reshape(3, 3, 3)
 
     def image_callback(self, image_data):
@@ -84,7 +84,7 @@ class PylonDetector:
             self.set_param()
             # イメージをパブリッシュ
             #self.pub_image()
-            # cv2.imshow('KUKEI', self.image)
+            cv2.imshow('KUKEI', self.image)
 
     # BGRからHSVに変換
     def hsv_convention(self):
@@ -240,9 +240,10 @@ class PylonDetector:
         self.depth_publish.publish(depth)
 
     #OpenCVで画像を表示
+
     def image_show(self):
         cv2.imshow('pylon_detection',self.image.astype('uint8'))
-        cv2.waitKey()
+        cv2.waitKey(1)
 
 def circle_dector_main():
     # ビデオ映像の取得
@@ -252,7 +253,7 @@ def circle_dector_main():
     while not rospy.is_shutdown():
         pylon_dector.image = pylon_dector.image_input.bgr_image
         pylon_dector.detection_main()
-        pylon_dector.image_show()
+
 
         # 終了の合図
         if cv2.waitKey(1) & 0xFF == ord('q'):

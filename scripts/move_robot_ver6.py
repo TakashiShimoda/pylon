@@ -1,9 +1,10 @@
-#!usr/bin/env python
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import rospy
 from geometry_msgs.msg import Twist
+from std_msgs.msg import Int8
 from std_msgs.msg import Float32
 from std_msgs.msg import String
-from visualization_msgs.msg import Marker
 import time
 
 class Main: 
@@ -12,61 +13,59 @@ class Main:
         self.datainput = Datainput()
         self.pub_vel = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
         rospy.on_shutdown(self.shutdown)
+        self.flag = 2
 
     def mainsystem(self):
         rospy.sleep(3)
         """self.marking_point_setting()
         rospy.sleep(0.01)"""
-        self.marking()                            
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01)
         print("setting_OK") """
-        self.marking()                 
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01)"""
-        self.marking()                  
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01)   """
-        self.marking()                 
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01) """
-        self.marking()          
         self.determining_pylon()
         rospy.sleep(1)
 
     def determining_pylon(self):
         self.z_data = 0
         main.z_data = main.datainput.data_z
-        self.flag = rospy.get_param("/pylon_color", None)
-        if self.flag == True : 
+        if self.flag == 1 : 
             print("pylon2")
+            print("now moving straight")
             self.move_straight()
-            print("straight")
+            print("moving straight finished") 
             rospy.sleep(0.01)
+            print("now rolling left")
             self.move_roll_left()
-            print("roll_left")
-        if self.flag == False :
+            print("rolling left finished")
+        if self.flag == 0 :
             print("pylon1")
+            print("now moving straight")
             self.move_straight()
-            print("straight")
+            print("moving straight finished")
             rospy.sleep(0.01)
+            print("now rolling right")
             self.move_roll_right()
-            print("roll_right")
-        if self.flag == None:
+            print("rolling_right finished")
+        if self.flag == 2:
             print(None)
             twist = Twist()
-            twist.linear.x = 0
+            twist.linear.x =0 
             twist.angular.z = 0
             self.pub_vel.publish(twist)
-    
 
     #def marking_point_setting(self):
         #twist = Twist()
@@ -82,10 +81,6 @@ class Main:
         #self.angular = 0
         #twist.angular.z = self.angular
         #self.pub_vel.publish(twist)
- 
-
-
-
 
     def move_straight(self):
         main.z_data = main.datainput.data_z
@@ -93,7 +88,7 @@ class Main:
         while not  self.z_data < 350 and not rospy.is_shutdown():
             main.z_data = main.datainput.data_z
             print(self.z_data)
-            twist.linear.x = 1.6
+            twist.linear.x =2.0 
             #if self.z_data > 500 :
             #    angular = self.angular_1()
             #else:  
@@ -107,10 +102,10 @@ class Main:
         data = self.center_calculate()
         self.e = 0 - data[0]
         if self.e > 60 :
-            angular = 1.5
+            angular = 0.5
             return angular
         if self.e < -60 :
-            angular = -1.5
+            angular = -0.5
             return angular
         else:
             angular = 0
@@ -121,10 +116,10 @@ class Main:
         data = self.center_calculate()
         self.e = 0 - data[0]
         if self.e > 1 :
-            angular = 1.5
+            angular = 0.5
             return angular
         if self.e < -1 :
-            angular = -1.5
+            angular = -0.5
             return angular
         if self.e <= 1 and self.e >= -1 :
             angular = 0
@@ -170,23 +165,13 @@ class Main:
         twist.angular.z = 0
         self.pub_vel.publish(twist)
 
-    def marking(self):
-        self.marking_flag = True
-        rospy.set_param("/move_robot_ver1/marking_flag", self.marking_flag)
-
-
     def center_calculate(self):
         main.x_data = main.datainput.data_x
         main.y_data = main.datainput.data_y
-        main.h_data = main.datainput.data_h
-        # main.depth_data = main.datainput.data_depth
-        main.w_data = main.datainput.data_w
-
-        center_x = self.x_data + self.w_data/2
-        center_y = self.y_data - self.h_data/2   
+        center_x = self.x_data
+        center_y = self.y_data   
         print(center_x)
         return center_x, center_y 
-
  
 
     def shutdown(self):
@@ -203,6 +188,7 @@ class Datainput:
         self.sub_z = rospy.Subscriber('/data_z', Float32, self.callback3)
         self.sub_h = rospy.Subscriber('/data_h', Float32, self.callback4)
         self.sub_w = rospy.Subscriber('/data_witdh', Float32, self.callback6)
+        self.sub_c = rospy.Subscriber('/data_color', Int8, self.callback7)
         #self.sub_depth = rospy.Subscriber('/data_depth',Float32,self.callback5)
 
 
@@ -212,6 +198,7 @@ class Datainput:
         self.data_h = 0
         #self.data_depth = 0
         self.data_w = 0
+        self.data_c = 0
      
 
     def callback1(self,messeage):
@@ -226,6 +213,8 @@ class Datainput:
     #    self.data_depth =  messeage.data
     def callback6(self,messeage):
         self.data_w = messeage.data
+    def callback7(self, message):
+        self.data_c = message.data
 
 if __name__ == '__main__': 
     rospy.init_node('move_robot')
@@ -238,7 +227,7 @@ if __name__ == '__main__':
         main.h_data = main.datainput.data_h
         # main.depth_data = main.datainput.data_depth
         main.w_data = main.datainput.data_w
-
+        main.flag = main.datainput.data_c
         main.mainsystem()
         rospy.sleep(0.1)
         rate.sleep()

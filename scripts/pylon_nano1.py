@@ -21,7 +21,7 @@ from goprocam import GoProCamera, constants
 class ImageInput:
     def __init__(self):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb0"), camera=constants.gpcontrol, webcam_device="usb0")
+        gopro = GoProCamera.GoPro(ip_address=GoProCamera.GoPro.getWebcamIP("usb1"), camera=constants.gpcontrol, webcam_device="usb1")
         gopro.webcamFOV(constants.Webcam.FOV.Narrow)
         
         gopro.startWebcam(resolution="720")
@@ -251,7 +251,7 @@ class PylonDetector:
 
 def circle_dector_main():
     # ビデオ映像の取得
-    rospy.init_node('pylon_dector')
+    rospy.init_node('pylon_dector1')
     pylon_dector = PylonDetector()
     rate = rospy.Rate(60)
     while not rospy.is_shutdown():
