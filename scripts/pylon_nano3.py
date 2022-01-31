@@ -26,6 +26,7 @@ class ImageInput:
         self.bgr_image = np.arange(27).reshape(3, 3, 3)
 
     def image_callback(self, image_data):
+        print("Image arrived!!")
         try:
             self.bgr_image = self.bridge.imgmsg_to_cv2(image_data)
         except CvBridgeError as e:
@@ -35,30 +36,32 @@ class PylonDetector:
     # パイロンナンバー
     PYLON_NUMBER = 1
     # 赤パイロンのHSV閾値
-    RED_PYLON_COLOR = (0, 40, 40), (2, 255, 255), (170, 40, 40), (179, 255, 255)
+    RED_PYLON_COLOR = (0, 60, 40), (5, 255, 225), (170, 76, 40), (179, 255, 225)
     # ガウシアンカーネルサイズ
     GAUSSIAN_KERNEL_SIZE = (3, 3)
     # モルフォロジー演算カーネルサイズ
     MORPHOLOGY_KERNEL_SIZE = np.ones((5,5), np.uint8)
     # パイロン〜カメラ間の実際の測定距離[mm]
-    BASE_DISTANCE = 600
+    BASE_DISTANCE = 1200
     # BASE_DISTANCEでのパイロンの高さ[pixel]
-    BASE_HEIGHT = 264
+    BASE_HEIGHT = 438
     # パイロンの高さ[mm]
-    PYLON_HEIGHT = 165
+    PYLON_HEIGHT = 700 
     # 画面の中央(横方向)[pixel]
     IMAGE_CENTER_X = 640
     # 画面の中央(高さ方向)[pixel]
     IMAGE_CENTER_Y = 360
     # パイロンの最小高さ
-    MIN_HEIGHT = 20
+    MIN_HEIGHT = 50
     # 600mm先のz位置[mm]
     Z = 600
 
     def __init__(self):
         self.is_pylon_data = False
         self.image_input = ImageInput()
+        self.bridge = CvBridge()
         self.camera_publish = rospy.Publisher("/camera_image", Image, queue_size=10)
+        self.bi_publish = rospy.Publisher("/bi_image", Image, queue_size=10)
         self.convert_x_publish = rospy.Publisher("/data_x", Float32, queue_size=1)
         self.convert_y_publish = rospy.Publisher("/data_y", Float32, queue_size=1)
         self.z_publish = rospy.Publisher("/data_z", Float32, queue_size=1)
@@ -85,11 +88,12 @@ class PylonDetector:
             # パラメータのセット
             self.set_param()
             # イメージをパブリッシュ
-            #self.pub_image()
+            self.pub_image()
             # cv2.imshow('KUKEI', self.image)
 
     # BGRからHSVに変換
     def hsv_convention(self):
+        print(self.image.shape)
         self.hsv_image = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
 
     # パイロンの輪郭検出
@@ -98,11 +102,14 @@ class PylonDetector:
         gaussian_filter_image = cv2.GaussianBlur(self.hsv_image, self.GAUSSIAN_KERNEL_SIZE, 0)
         # 二値化
         binarization_image_1 = cv2.inRange(gaussian_filter_image, self.RED_PYLON_COLOR[0], self.RED_PYLON_COLOR[1])
+        binarization_image_1 = cv2.inRange(gaussian_filter_image, self.RED_PYLON_COLOR[0], self.RED_PYLON_COLOR[1])
         binarization_image_2 = cv2.inRange(gaussian_filter_image, self.RED_PYLON_COLOR[2], self.RED_PYLON_COLOR[3])
         binarization_image = cv2.add(binarization_image_1, binarization_image_2)
         # クロージング(膨張、収縮の順に行う演算)
         morphology_close_image = cv2.morphologyEx(binarization_image, cv2.MORPH_CLOSE, self.MORPHOLOGY_KERNEL_SIZE)
         #cv2.imshow('mask', morphology_close_image)
+        bi = cv2.cvtColor(morphology_close_image, cv2.COLOR_GRAY2BGR)
+        self.bi_publish.publish(self.bridge.cv2_to_imgmsg(bi,'bgr8' ))
         # 輪郭検出
         countours, hierarchy = cv2.findContours(morphology_close_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         # print countours
@@ -113,11 +120,13 @@ class PylonDetector:
         if len(countours) > index_number:
             # 面積が大きい順に並べ替える
             countours.sort(key=cv2.contourArea, reverse=True)
+            print(len(countours))
             cnt = countours[index_number]
             
             ## 回転を考慮しない外接円
             # 左上の座標(x, y)、横と縦のサイズ(width, height)を取得
             x,y,width,height = cv2.boundingRect(cnt)
+            #print(x)
             # 矩形の左上の座標取得
             top_left = (int(x), int(y))
             top_center = (int(x)+round(0.5*width), int(y))
@@ -129,7 +138,7 @@ class PylonDetector:
             width = float(width)
             # パイロンの縦横比
             aspect_ratio = float(width / height)
-            print(aspect_ratio)
+            #print(aspect_ratio)
             # aspect_ratioの判定 >> パイロンの判別
             if (aspect_ratio > 0.8) and (aspect_ratio < 1.8):
                 if height <= self.MIN_HEIGHT:
@@ -137,7 +146,6 @@ class PylonDetector:
                     return False
                    
                 # 矩形描画
-                cv2.rectangle(self.image, (x, y-int(height*1.1)), (x+int(width), y+int(height)), (255, 0, 0), 2)
                 
             # ## 回転を考慮した外接円
             # # Box2D(左上の座標(x, y)、横と縦のサイズ(width, height)、回転角)を取得
@@ -168,21 +176,22 @@ class PylonDetector:
                 self.h_datas[index_number] = height
                 self.convert_x_datas[index_number] = convert_x
                 self.pub_param(convert_x, convert_y, Z*0.485, height, depth)
-                self.color_info_publish(0)
+                #画面両端に接するパイロンを除外
+                if (x > 20) and (x+width < 1260):
+                    self.color_info_publish(0)
+                    cv2.rectangle(self.image, (x, y-int(height*1.25)), (x+int(width), y+int(height)), (255, 0, 0), 2)
                 cv2.putText(self.image, "Z="+str(round(Z*0.485))+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189,104, 30), thickness=2)
-                cv2.putText(self.image, "PylonHeight="+str(height)+"[pixel]", (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
                 # print convert_x
                 # print Z*0.58
                 return True
                 
-            
-            if (aspect_ratio > 0.5) and (aspect_ratio < 0.8):
+        
+            if (aspect_ratio > 0.35) and (aspect_ratio < 0.8):
                 if height <= self.MIN_HEIGHT:
                     return False
                 # 矩形描画(回転あり)
                 # cv2.drawContours(self.image, [box], 0, (0, 255, 0), 2)
                 # 矩形描画(回転なし)
-                cv2.rectangle(self.image, (x, y), (x+int(width), y+int(height)), (0, 255, 0), 2)
                 
                 convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height, top_center)
                 
@@ -190,7 +199,9 @@ class PylonDetector:
                 self.h_datas[index_number] = height
                 self.convert_x_datas[index_number] = convert_x
                 self.pub_param(convert_x, convert_y, Z, height, depth)
-                self.color_info_publish(1)
+                if (x > 20) and (x+width < 1260):
+                    self.color_info_publish(1)
+                    cv2.rectangle(self.image, (x, y), (x+int(width), y+int(height)), (0, 255, 0), 2)
                 cv2.putText(self.image, "Z="+str(Z)+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189,104, 30), thickness=2) 
                 cv2.putText(self.image, "PylonHeight="+str(height)+"[pixel]", (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
                 #print Z
@@ -238,10 +249,10 @@ class PylonDetector:
             #print self.z_datas[max_index]
         
         
-    """
+    
     def pub_image(self):
-        self.camera_publish.publish(self.image_imput.bridge.cv2_to_imgmsg(self.image, 'bgr8'))
-    """
+        self.camera_publish.publish(self.bridge.cv2_to_imgmsg(self.image, 'bgr8'))
+   
     # パラメータをパブリッシュ
     def pub_param(self, convert_x, convert_y, Z, height, depth):
         self.convert_x_publish.publish(convert_x)
@@ -265,9 +276,9 @@ def circle_dector_main():
 
     while not rospy.is_shutdown():
         pylon_dector.image = pylon_dector.image_input.bgr_image
-        pylon_dector.image = cv2.rotate(pylon_dector.image, cv2.ROTATE_180)#カメラ取り付け位置の関係で画像を反転する
+        #pylon_dector.image = cv2.rotate(pylon_dector.image, cv2.ROTATE_180)#カメラ取り付け位置の関係で画像を反転する
+        #pylon_dector.image_show()
         pylon_dector.detection_main()
-        pylon_dector.image_show()
 
         # 終了の合図
         if cv2.waitKey(1) & 0xFF == ord('q'):

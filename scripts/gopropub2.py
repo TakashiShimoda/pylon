@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #GoProからの映像をImageとしてパブリッシュするノード
+#yolo用にリサイズする機能付き
 
 import cv2
 import rospy
@@ -23,9 +24,15 @@ class ImageInput:
         try:
             ret, frame = self.cap.read()
             #cv2.imshow("GoPro OpenCV", frame)
-            print(frame.shape)
+            height = 240
+            h,w = frame.shape[:2]
+            width = round(w*height/h)
+            if width%2 == 1:
+                width +=1
             #dst = cv2.resize(frame, dsize=(640, 480))
-            conv = ros_numpy.msgify(Image, frame, encoding='bgr8')
+            resized = cv2.resize(frame, dsize=(width,height))
+            print(resized.shape)
+            conv = ros_numpy.msgify(Image, resized, encoding='bgr8')
             self.pub.publish(conv)
         except Exception as err:
             print(err)

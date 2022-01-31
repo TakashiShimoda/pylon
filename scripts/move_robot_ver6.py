@@ -19,47 +19,52 @@ class Main:
         rospy.sleep(3)
         """self.marking_point_setting()
         rospy.sleep(0.01)"""
+        self.flag = self.datainput.data_c
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01)
-        print("setting_OK") """
+        print("setting_OK") """ 
+        self.flag = self.datainput.data_c
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01)"""
+        self.flag = self.datainput.data_c
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01)   """
+        self.flag = self.datainput.data_c
         self.determining_pylon()
         rospy.sleep(1)
         """self.marking_point_setting()
         rospy.sleep(0.01) """
+        self.flag = self.datainput.data_c
         self.determining_pylon()
         rospy.sleep(1)
 
     def determining_pylon(self):
         self.z_data = 0
         main.z_data = main.datainput.data_z
-        if self.flag == 1 : 
+        if self.flag ==  0: 
             print("pylon2")
-            print("now moving straight")
+            print("now moving straight 直進します")
             self.move_straight()
-            print("moving straight finished") 
+            print("moving straight finished 直進終了") 
             rospy.sleep(0.01)
-            print("now rolling left")
+            print("now rolling left 左へ曲がります")
             self.move_roll_left()
-            print("rolling left finished")
-        if self.flag == 0 :
+            print("rolling left finished 左へ曲がりました")
+        if self.flag == 1 :
             print("pylon1")
-            print("now moving straight")
+            print("now moving straight 直進します")
             self.move_straight()
-            print("moving straight finished")
+            print("moving straight finished 直進終了")
             rospy.sleep(0.01)
-            print("now rolling right")
+            print("now rolling right 右へ曲がります")
             self.move_roll_right()
-            print("rolling_right finished")
+            print("rolling_right finished 右へ曲がりました")
         if self.flag == 2:
             print(None)
             twist = Twist()
@@ -102,10 +107,10 @@ class Main:
         data = self.center_calculate()
         self.e = 0 - data[0]
         if self.e > 60 :
-            angular = 0.5
+            angular = 1
             return angular
         if self.e < -60 :
-            angular = -0.5
+            angular = -1
             return angular
         else:
             angular = 0
@@ -114,7 +119,7 @@ class Main:
      
     def angular_pid(self):
         data = self.center_calculate()
-        self.e = 0 - data[0]
+        #self.e = 0 - data[0]
         if self.e > 1 :
             angular = 0.5
             return angular
@@ -135,7 +140,7 @@ class Main:
                 twist.angular.z = -1.6
                 self.pub_vel.publish(twist)
                 rate.sleep()
-        while  data[0] > 20 and not  rospy.is_shutdown():
+        while  data[0] > 70 and not  rospy.is_shutdown():
                 data = self.center_calculate()
                 twist.linear.x = 1.5
                 twist.angular.z = -2.3
@@ -155,7 +160,7 @@ class Main:
                 twist.angular.z = 1.7
                 self.pub_vel.publish(twist)
                 rate.sleep()
-        while  data[0] < -20 and not  rospy.is_shutdown():
+        while  data[0] < -70 and not  rospy.is_shutdown():
                 data = self.center_calculate()
                 twist.linear.x = 1.5
                 twist.angular.z = 2.5
@@ -219,7 +224,7 @@ class Datainput:
 if __name__ == '__main__': 
     rospy.init_node('move_robot')
     main = Main()
-    rate = rospy.Rate(30)
+    rate = rospy.Rate(60)
     while not rospy.is_shutdown():
         main.x_data = main.datainput.data_x
         main.y_data = main.datainput.data_y

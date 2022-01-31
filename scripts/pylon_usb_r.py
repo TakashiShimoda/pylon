@@ -34,7 +34,7 @@ class PylonDetector:
     # パイロンナンバー
     PYLON_NUMBER = 1
     # 赤パイロンのHSV閾値
-    RED_PYLON_COLOR = (0, 20, 20), (5, 255, 255), (170, 20, 20), (179, 255, 255)
+    RED_PYLON_COLOR = (0, 20, 100), (5, 255, 255), (170, 20, 100), (179, 255, 255)
     # ガウシアンカーネルサイズ
     GAUSSIAN_KERNEL_SIZE = (3, 3)
     # モルフォロジー演算カーネルサイズ
@@ -50,7 +50,7 @@ class PylonDetector:
     # 画面の中央(高さ方向)[pixel]
     IMAGE_CENTER_Y = 240
     # パイロンの最小高さ
-    MIN_HEIGHT = 25
+    MIN_HEIGHT = 20
     # 600mm先のz位置[mm]
     Z = 600
 
@@ -113,56 +113,63 @@ class PylonDetector:
             countours.sort(key=cv2.contourArea, reverse=True)
             cnt = countours[index_number]
             
-            ## 回転を考慮しない外接円
-            # 左上の座標(x, y)、横と縦のサイズ(width, height)を取得
-            x,y,width,height = cv2.boundingRect(cnt)
+            ### 回転を考慮しない外接円
+            ## 左上の座標(x, y)、横と縦のサイズ(width, height)を取得
+            #x,y,width,height = cv2.boundingRect(cnt)
+            ## 矩形の左上の座標取得
+            #top_left = (int(x), int(y))
+            #top_center = (int(x)+round(0.5*width), int(y))
+            ## 矩形の高さ(縦)[pixel]
+            #height = float(height)
+            #if height == 0:
+            #    return False
+            ## 矩形の幅(横)[pixel]
+            #width = float(width)
+            ## パイロンの縦横比
+            #aspect_ratio = float(width / height)
+            ## print aspect_ratio
+            ## aspect_ratioの判定 >> パイロンの判別
+            #if (aspect_ratio > 1.4) and (aspect_ratio < 1.8):
+            #    if height <= self.MIN_HEIGHT:
+            #        return False
+            #    # 矩形描画
+            #    cv2.rectangle(self.image, (x, y-int(height*0.8)), (x+int(width), y+int(height)), (255, 0, 0), 2)
+                
+            ## 回転を考慮した外接円
+            # Box2D(左上の座標(x, y)、横と縦のサイズ(width, height)、回転角)を取得
+            rect = cv2.minAreaRect(cnt)
+            # 4点座標に変換
+            box = np.int0(cv2.boxPoints(rect))
+            print(box[0][1])
+            print(rect[2])
             # 矩形の左上の座標取得
-            top_left = (int(x), int(y))
-            top_center = (int(x)+round(0.5*width), int(y))
+            top_left = (int(rect[0][0]), int(rect[0][1]))
             # 矩形の高さ(縦)[pixel]
-            height = float(height)
+            height = float(rect[1][0])
             if height == 0:
                 return False
             # 矩形の幅(横)[pixel]
-            width = float(width)
+            width = float(rect[1][1])
             # パイロンの縦横比
-            print(height, width)
+            #必要に応じて縦横の値を入れ替え
+            """
+            if width > height:
+                width, height = height, width
+            """
             aspect_ratio = float(width / height)
-            # print aspect_ratio
+            #print(aspect_ratio)
+            #print(rect)
             # aspect_ratioの判定 >> パイロンの判別
             if (aspect_ratio > 1.0) and (aspect_ratio < 1.8):
                 if height <= self.MIN_HEIGHT:
                     return False
                 # 矩形描画
-                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height*2.164, top_center)
-                cv2.rectangle(self.image, (x, y-int(height*1.23)), (x+int(width), y+int(height)), (255, 0, 0), 2)
-                cv2.putText(self.image, "Z="+str(Z)+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189, 104, 30), thickness=2) 
+                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height*2.164, top_left)
+                box[2] = [box[2][0] + height * 1.164 * np.sin(-rect[2]), box[2][1] - height * 1.4 * np.cos(-rect[2])] 
+                box[3] = [box[3][0] + height * 1.164 * np.sin(-rect[2]), box[3][1] - height * 1.4 * np.cos(-rect[2])] 
+                cv2.drawContours(self.image, [box], 0, (255, 0, 0), 2)
+                cv2.putText(self.image, "Z="+str(Z)+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189, 104, 30), thickness=2)
                 cv2.putText(self.image, "PylonHeight="+str(height)+"[pixel]", (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
-                print(aspect_ratio)
-            # ## 回転を考慮した外接円
-            # # Box2D(左上の座標(x, y)、横と縦のサイズ(width, height)、回転角)を取得
-            # rect = cv2.minAreaRect(cnt)
-            # # 4点座標に変換
-            # box = np.int0(cv2.boxPoints(rect))
-            # # 矩形の左上の座標取得
-            # top_left = (int(rect[0][0]), int(rect[0][1]))
-            # # 矩形の高さ(縦)[pixel]
-            # height = float(rect[1][1])
-            # if height == 0:
-            #     return False
-            # # 矩形の幅(横)[pixel]
-            # width = float(rect[1][0])
-            # # パイロンの縦横比
-            # aspect_ratio = float(width / height)
-            # print aspect_ratio
-            # # aspect_ratioの判定 >> パイロンの判別
-            # if (aspect_ratio > 1.6) and (aspect_ratio < 1.8):
-            #     if height <= self.MIN_HEIGHT:
-            #         return False
-            #     # 矩形描画
-            #     cv2.drawContours(self.image, [box], 0, (255, 0, 0), 2)
-            
-                
                 self.z_datas[index_number] = Z*0.58
                 self.h_datas[index_number] = height
                 self.convert_x_datas[index_number] = convert_x
@@ -175,13 +182,14 @@ class PylonDetector:
                 if height <= self.MIN_HEIGHT:
                     return False
                 # 矩形描画(回転あり)
-                # cv2.drawContours(self.image, [box], 0, (0, 255, 0), 2)
+                cv2.drawContours(self.image,[box], 0, (0, 255, 0), 2)
                 # 矩形描画(回転なし)
-                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height, top_center)
-                cv2.rectangle(self.image, (x, y), (x+int(width), y+int(height)), (0, 255, 0), 2)
+                #cv2.rectangle(self.image, (x, y), (x+int(width), y+int(height)), (0, 255, 0), 2)
+                
+                convert_x, convert_y, Z, depth = self.calculate_depth(aspect_ratio, height, top_left)
                 cv2.putText(self.image, "Z="+str(Z)+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189, 104, 30), thickness=2)
                 cv2.putText(self.image, "PylonHeight="+str(height)+"[pixel]", (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
-                #print(aspect_ratio) 
+
                 
                 self.z_datas[index_number] = Z
                 self.h_datas[index_number] = height
@@ -192,6 +200,7 @@ class PylonDetector:
         else:
             return False
 
+    """
     # 三次元位置(X, Y, Z)の計算(回転なし)
     def calculate_depth(self, aspect_ratio, height, top_center):
         # 奥行き方向の計算
@@ -204,24 +213,28 @@ class PylonDetector:
         if depth > convert_x:
             Z = math.sqrt(depth * depth - convert_x * convert_x)
         convert_x, convert_y, Z, depth = round(convert_x), round(convert_y), round(Z), round(depth)
-        #cv2.putText(self.image, "Z="+str(Z)+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189, 104, 30), thickness=2)
-        #cv2.putText(self.image, "PylonHeight="+str(height)+"[pixel]", (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
-        #cv2.putText(self.image, 'x='+ str(convert_x) + '[mm]', (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
+        cv2.putText(self.image, "Z="+str(Z)+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189, 104, 30), thickness=2)
+        cv2.putText(self.image, "PylonHeight="+str(height)+"[pixel]", (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
         return convert_x, convert_y, Z, depth
-        
-    # # 三次元位置(X, Y, Z)の計算(回転あり)
-    # def calculate_depth(self, aspect_ratio, height, top_left):
-    #     # 奥行き方向の計算
-    #     depth = (self.BASE_HEIGHT / float(height)) * self.BASE_DISTANCE
-    #     # 1ピクセル当たりの大きさを計算
-    #     one_pixel_size = self.PYLON_HEIGHT / float(height)
-    #     # 三次元位置(X, Y, Z)の計算
-    #     convert_x = (top_left[0] - self.IMAGE_CENTER_X) * one_pixel_size
-    #     convert_y = (self.IMAGE_CENTER_Y - top_left[1]) * one_pixel_size
-    #     if depth > convert_x:
-    #         Z = math.sqrt(depth * depth - convert_x * convert_x)CV_Error
-    #     convert_x, convert_y, Z, depth = round(convert_x), round(convert_y), round(Z), round(depth)
-    #     return convert_x, convert_y, Z, depth
+    """
+
+    # 三次元位置(X, Y, Z)の計算(回転あり)
+    def calculate_depth(self, aspect_ratio, height, top_left):
+        # 奥行き方向の計算
+        depth = (self.BASE_HEIGHT / float(height)) * self.BASE_DISTANCE
+        # 1ピクセル当たりの大きさを計算
+        one_pixel_size = self.PYLON_HEIGHT / float(height)
+        # 三次元位置(X, Y, Z)の計算
+        convert_x = (top_left[0] - self.IMAGE_CENTER_X) * one_pixel_size
+        convert_y = (self.IMAGE_CENTER_Y - top_left[1]) * one_pixel_size
+        if depth > convert_x:
+            Z = math.sqrt(depth * depth - convert_x * convert_x)
+        convert_x, convert_y, Z, depth = round(convert_x), round(convert_y), round(Z), round(depth)
+        """
+        cv2.putText(self.image, "Z="+str(Z)+"[mm]", (5, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (189, 104, 30), thickness=2)
+        cv2.putText(self.image, "PylonHeight="+str(int(height))+"[pixel]", (5, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (252, 104, 189), thickness=2)
+        """
+        return convert_x, convert_y, Z, depth
     
     # パラメータをセット
     def set_param(self):
@@ -259,7 +272,7 @@ def circle_dector_main():
         pylon_dector.image = pylon_dector.image_input.bgr_image
         pylon_dector.detection_main()
         pylon_dector.pub_image()
-        # pylon_dector.image_show()
+        #pylon_dector.image_show()
 
         # 終了の合図
         if cv2.waitKey(1) & 0xFF == ord('q'):

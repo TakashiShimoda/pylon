@@ -1,0 +1,9 @@
+<launch>
+    <node pkg="pylon" name="control" type="move_robot_ver6.py"/>
+    <node pkg="pylon" name="odometry" type="odometry.py"/>
+    <node pkg="pylon" name="pylon_detector" type="pylon_nano3.py"/>
+    <node pkg="pylon" name="gopro" type="gopropub.py"/>
+    <node pkg="rosserial_python" name="serial_node" type="serial_node.py">
+        <param name="port" value="/dev/ttyACM0"/>
+    </node>
+</launch>
